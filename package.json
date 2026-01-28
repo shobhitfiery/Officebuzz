@@ -3,6 +3,7 @@
     "@emotion/styled": "^11.14.1",
     "@mui/icons-material": "^7.3.6",
     "@mui/material": "^7.3.6",
+    "pm2": "^6.0.14",
     "xlsx": "^0.18.5"
   }
 }

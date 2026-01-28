@@ -5,6 +5,7 @@ const dotenv = require('dotenv');
 const connectDB = require('./config/db');
 const authRoutes = require('./routes/authRoutes');
 const ledgerRoutes = require("./routes/ledgerRoutes");
+const employeeRoutes = require("./routes/employeeRoutes");
 // const productRoutes = require('./routes/productRoutes');
 // const orderRoutes = require('./routes/orderRoutes');
 const { notFound, errorHandler } = require('./middleware/errorMiddleware');
@@ -21,6 +22,7 @@ app.use(express.json());
 app.use(cors());
 
 app.use("/api/ledger", ledgerRoutes);
+app.use("/api/employees", employeeRoutes);
 
 app.use('/api/users', authRoutes);
 // app.use('/api/products', productRoutes);
