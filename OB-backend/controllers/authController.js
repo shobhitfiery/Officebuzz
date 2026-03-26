@@ -85,5 +85,44 @@ const getAllUsers = asyncHandler(async (req, res) => {
     res.json(users);
 });
 
+// Reset user password (admin only)
+const resetUserPassword = asyncHandler(async (req, res) => {
+    const { password } = req.body;
 
-module.exports = { registerUser, authUser, getUserProfile, getAllUsers };
+    if (!password || password.trim().length < 6) {
+        res.status(400);
+        throw new Error('Password must be at least 6 characters long');
+    }
+
+    const user = await User.findById(req.params.id);
+
+    if (!user) {
+        res.status(404);
+        throw new Error('User not found');
+    }
+
+    user.password = password;
+    await user.save();
+
+    res.json({
+        message: 'Password reset successfully',
+        userId: user._id,
+        email: user.email,
+    });
+});
+
+// Delete user (admin only)
+const deleteUser = asyncHandler(async (req, res) => {
+    const user = await User.findById(req.params.id);
+
+    if (user) {
+        await user.deleteOne();
+        res.json({ message: 'User removed successfully' });
+    } else {
+        res.status(404);
+        throw new Error('User not found');
+    }
+});
+
+
+module.exports = { registerUser, authUser, getUserProfile, getAllUsers, resetUserPassword, deleteUser };

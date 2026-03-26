@@ -89,19 +89,21 @@ const deleteEmployee = asyncHandler(async (req, res) => {
 const getUpcomingBirthdays = asyncHandler(async (req, res) => {
   const employees = await Employee.find({ birthday: { $exists: true, $ne: null } });
   
-  const today = new Date();
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()); // Normalize to midnight
+  
   const upcomingEmployees = employees.filter(employee => {
     if (!employee.birthday) return false;
     
     const birthday = new Date(employee.birthday);
-    const thisYearBirthday = new Date(today.getFullYear(), birthday.getMonth(), birthday.getDate());
+    let thisYearBirthday = new Date(today.getFullYear(), birthday.getMonth(), birthday.getDate());
     
     // If birthday has passed this year, check next year
     if (thisYearBirthday < today) {
-      thisYearBirthday.setFullYear(today.getFullYear() + 1);
+      thisYearBirthday = new Date(today.getFullYear() + 1, birthday.getMonth(), birthday.getDate());
     }
     
-    const daysUntil = Math.ceil((thisYearBirthday - today) / (1000 * 60 * 60 * 24));
+    const daysUntil = Math.round((thisYearBirthday - today) / (1000 * 60 * 60 * 24));
     return daysUntil >= 0 && daysUntil <= 30;
   });
   
@@ -114,23 +116,82 @@ const getUpcomingBirthdays = asyncHandler(async (req, res) => {
 const getUpcomingAnniversaries = asyncHandler(async (req, res) => {
   const employees = await Employee.find({ anniversary: { $exists: true, $ne: null } });
   
-  const today = new Date();
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()); // Normalize to midnight
+  
   const upcomingEmployees = employees.filter(employee => {
     if (!employee.anniversary) return false;
     
     const anniversary = new Date(employee.anniversary);
-    const thisYearAnniversary = new Date(today.getFullYear(), anniversary.getMonth(), anniversary.getDate());
+    let thisYearAnniversary = new Date(today.getFullYear(), anniversary.getMonth(), anniversary.getDate());
     
     // If anniversary has passed this year, check next year
     if (thisYearAnniversary < today) {
-      thisYearAnniversary.setFullYear(today.getFullYear() + 1);
+      thisYearAnniversary = new Date(today.getFullYear() + 1, anniversary.getMonth(), anniversary.getDate());
     }
     
-    const daysUntil = Math.ceil((thisYearAnniversary - today) / (1000 * 60 * 60 * 24));
+    const daysUntil = Math.round((thisYearAnniversary - today) / (1000 * 60 * 60 * 24));
     return daysUntil >= 0 && daysUntil <= 30;
   });
   
   res.json(upcomingEmployees);
+});
+
+// @desc Get employees with celebrations today (birthday, anniversary, or work anniversary)
+// @route GET /api/employees/today/celebrations
+// @access Private
+const getTodayCelebrations = asyncHandler(async (req, res) => {
+  const employees = await Employee.find();
+  
+  const today = new Date();
+  const todayMonth = today.getMonth();
+  const todayDate = today.getDate();
+  
+  const celebrations = [];
+  
+  employees.forEach(employee => {
+    // Check birthday
+    if (employee.birthday) {
+      const birthday = new Date(employee.birthday);
+      if (birthday.getMonth() === todayMonth && birthday.getDate() === todayDate) {
+        celebrations.push({
+          name: employee.name,
+          type: 'birthday',
+          date: employee.birthday
+        });
+      }
+    }
+    
+    // Check anniversary
+    if (employee.anniversary) {
+      const anniversary = new Date(employee.anniversary);
+      if (anniversary.getMonth() === todayMonth && anniversary.getDate() === todayDate) {
+        celebrations.push({
+          name: employee.name,
+          type: 'anniversary',
+          date: employee.anniversary
+        });
+      }
+    }
+    
+    // Check work anniversary (joining date)
+    if (employee.joiningDate) {
+      const joiningDate = new Date(employee.joiningDate);
+      if (joiningDate.getMonth() === todayMonth && joiningDate.getDate() === todayDate) {
+        const yearsWorked = today.getFullYear() - joiningDate.getFullYear();
+        if (yearsWorked > 0) {
+          celebrations.push({
+            name: employee.name,
+            type: 'work_anniversary',
+            date: employee.joiningDate,
+            years: yearsWorked
+          });
+        }
+      }
+    }
+  });
+  
+  res.json(celebrations);
 });
 
 module.exports = {
@@ -141,4 +202,5 @@ module.exports = {
   deleteEmployee,
   getUpcomingBirthdays,
   getUpcomingAnniversaries,
+  getTodayCelebrations,
 };

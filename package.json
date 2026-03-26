@@ -1,4 +1,16 @@
 {
+  "scripts": {
+    "start": "npm run start:frontend",
+    "start:frontend": "npm --prefix officebuzz start",
+    "start:backend": "npm --prefix OB-backend start",
+    "start:all": "npm run start:backend & npm run start:frontend",
+    "build": "npm --prefix officebuzz run build",
+    "deploy": "npm run build && pm2 startOrRestart pm2.config.js",
+    "pm2:start": "pm2 startOrRestart pm2.config.js",
+    "pm2:stop": "pm2 stop officebuzz-backend",
+    "pm2:logs": "pm2 logs officebuzz-backend",
+    "pm2:status": "pm2 status"
+  },
   "dependencies": {
     "@emotion/styled": "^11.14.1",
     "@mui/icons-material": "^7.3.6",

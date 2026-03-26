@@ -9,6 +9,7 @@ const {
   deleteEmployee,
   getUpcomingBirthdays,
   getUpcomingAnniversaries,
+  getTodayCelebrations,
 } = require("../controllers/employeeController");
 
 const { protect, admin } = require("../middleware/authMiddleware");
@@ -16,6 +17,7 @@ const { protect, admin } = require("../middleware/authMiddleware");
 // Get upcoming birthdays and anniversaries (any logged-in user)
 router.get("/upcoming/birthdays", protect, getUpcomingBirthdays);
 router.get("/upcoming/anniversaries", protect, getUpcomingAnniversaries);
+router.get("/today/celebrations", protect, getTodayCelebrations);
 // router.get("/upcoming/workanniversaries", protect, getUpcomingWorkAnniversaries);
 
 // View all employees and individual employee (any logged-in user)
