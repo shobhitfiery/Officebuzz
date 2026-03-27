@@ -1,6 +1,25 @@
 const asyncHandler = require("express-async-handler");
 const Ledger = require("../models/ledgerModel");
 
+const recalculateLedgerBalances = async () => {
+  const entries = await Ledger.find().sort({ timestamp: 1, createdAt: 1, _id: 1 });
+
+  let runningBalance = 0;
+  const operations = entries.map((entry) => {
+    runningBalance += Number(entry.transactionAmount) || 0;
+    return {
+      updateOne: {
+        filter: { _id: entry._id },
+        update: { $set: { balance: runningBalance } },
+      },
+    };
+  });
+
+  if (operations.length > 0) {
+    await Ledger.bulkWrite(operations);
+  }
+};
+
 // @desc Get all ledger entries (any logged-in user)
 // @route GET /api/ledger
 // @access Private
@@ -13,74 +32,67 @@ const getLedgerEntries = asyncHandler(async (req, res) => {
 // @route POST /api/ledger
 // @access Private/Admin
 const addLedgerEntry = asyncHandler(async (req, res) => {
-    const { transactionAmount, employee, remarks, date } = req.body;
-  
-    if (!transactionAmount || !employee) {
-      res.status(400);
-      throw new Error("Transaction amount and employee are required");
-    }
-  
-    const amount = Number(transactionAmount);
-    if (isNaN(amount)) {
-      res.status(400);
-      throw new Error("Invalid transaction amount");
-    }
-  
-    const lastEntry = await Ledger.findOne().sort({ timestamp: -1 });
-    const newBalance = lastEntry ? lastEntry.balance + amount : amount;
-  
-    const ledger = await Ledger.create({
-      transactionAmount: amount,
-      employee,
-      remarks,
-      balance: newBalance,
-      timestamp: date ? new Date(date) : new Date(),
-      depositDate: date ? new Date(date) : new Date(),
-    });
-  
-    res.status(201).json(ledger);
+  const { transactionAmount, employee, remarks, date } = req.body;
+
+  if (transactionAmount === undefined || transactionAmount === null || !employee) {
+    res.status(400);
+    throw new Error("Transaction amount and employee are required");
+  }
+
+  const amount = Number(transactionAmount);
+  if (isNaN(amount)) {
+    res.status(400);
+    throw new Error("Invalid transaction amount");
+  }
+
+  const ledger = await Ledger.create({
+    transactionAmount: amount,
+    employee,
+    remarks,
+    balance: 0,
+    timestamp: date ? new Date(date) : new Date(),
+    depositDate: date ? new Date(date) : new Date(),
   });
+
+  await recalculateLedgerBalances();
+  const updatedLedger = await Ledger.findById(ledger._id);
+
+  res.status(201).json(updatedLedger);
+});
   
 
 // @desc Update ledger entry (admin only)
 // @route PUT /api/ledger/:id
 // @access Private/Admin
 const updateLedgerEntry = asyncHandler(async (req, res) => {
-    const { transactionAmount, employee, remarks, date } = req.body;
-  
-    const entry = await Ledger.findById(req.params.id);
-    if (!entry) {
-      res.status(404);
-      throw new Error("Ledger entry not found");
-    }
-  
-    entry.transactionAmount = transactionAmount;
-    entry.employee = employee;
-    entry.remarks = remarks;
-    if (date) {
-      entry.timestamp = new Date(date);
-      entry.depositDate = new Date(date);
-    }
-    await entry.save();
-  
-    // Recalculate balance for this and all subsequent entries
-    // Find previous entry (by timestamp)
-    const previousEntry = await Ledger.findOne({ timestamp: { $lt: entry.timestamp } }).sort({ timestamp: -1 });
-    entry.balance = previousEntry ? previousEntry.balance + entry.transactionAmount : entry.transactionAmount;
-    await entry.save();
-  
-    // Update subsequent entries
-    const subsequentEntries = await Ledger.find({ timestamp: { $gt: entry.timestamp } }).sort({ timestamp: 1 });
-    let runningBalance = entry.balance;
-  
-    for (const e of subsequentEntries) {
-      runningBalance += e.transactionAmount;
-      e.balance = runningBalance;
-      await e.save();
-    }
-  
-    res.json(entry);
-  });
+  const { transactionAmount, employee, remarks, date } = req.body;
+
+  const entry = await Ledger.findById(req.params.id);
+  if (!entry) {
+    res.status(404);
+    throw new Error("Ledger entry not found");
+  }
+
+  const amount = Number(transactionAmount);
+  if (isNaN(amount)) {
+    res.status(400);
+    throw new Error("Invalid transaction amount");
+  }
+
+  entry.transactionAmount = amount;
+  entry.employee = employee;
+  entry.remarks = remarks;
+  if (date) {
+    entry.timestamp = new Date(date);
+    entry.depositDate = new Date(date);
+  }
+  await entry.save();
+
+  await recalculateLedgerBalances();
+  const updatedEntry = await Ledger.findById(entry._id);
+
+  res.json(updatedEntry);
+});
   
 
 // @desc Delete ledger entry (admin only)
@@ -95,6 +107,7 @@ const deleteLedgerEntry = asyncHandler(async (req, res) => {
   }
 
   await entry.deleteOne();
+  await recalculateLedgerBalances();
   res.json({ message: "Ledger entry deleted" });
 });
 
