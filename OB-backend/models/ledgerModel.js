@@ -8,6 +8,11 @@ const ledgerSchema = new mongoose.Schema(
       required: true,
     },
 
+    depositDate: {
+      type: Date,
+      default: null,
+    },
+
     transactionAmount: {
       type: Number,
       required: true,

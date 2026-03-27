@@ -13,31 +13,29 @@ const getLedgerEntries = asyncHandler(async (req, res) => {
 // @route POST /api/ledger
 // @access Private/Admin
 const addLedgerEntry = asyncHandler(async (req, res) => {
-    const { transactionAmount, employee, remarks } = req.body;
+    const { transactionAmount, employee, remarks, date } = req.body;
   
     if (!transactionAmount || !employee) {
       res.status(400);
       throw new Error("Transaction amount and employee are required");
     }
   
-    // Convert transactionAmount to number
     const amount = Number(transactionAmount);
     if (isNaN(amount)) {
       res.status(400);
       throw new Error("Invalid transaction amount");
     }
   
-    // Find last ledger entry to calculate new balance
     const lastEntry = await Ledger.findOne().sort({ timestamp: -1 });
     const newBalance = lastEntry ? lastEntry.balance + amount : amount;
   
-    // Create new ledger entry
     const ledger = await Ledger.create({
       transactionAmount: amount,
       employee,
       remarks,
-      balance: newBalance,  // calculated automatically
-      timestamp: new Date(),
+      balance: newBalance,
+      timestamp: date ? new Date(date) : new Date(),
+      depositDate: date ? new Date(date) : new Date(),
     });
   
     res.status(201).json(ledger);
@@ -48,19 +46,21 @@ const addLedgerEntry = asyncHandler(async (req, res) => {
 // @route PUT /api/ledger/:id
 // @access Private/Admin
 const updateLedgerEntry = asyncHandler(async (req, res) => {
-    const { transactionAmount, employee, remarks } = req.body;
+    const { transactionAmount, employee, remarks, date } = req.body;
   
-    // Find the entry to update
     const entry = await Ledger.findById(req.params.id);
     if (!entry) {
       res.status(404);
       throw new Error("Ledger entry not found");
     }
   
-    // Update the entry fields
     entry.transactionAmount = transactionAmount;
     entry.employee = employee;
     entry.remarks = remarks;
+    if (date) {
+      entry.timestamp = new Date(date);
+      entry.depositDate = new Date(date);
+    }
     await entry.save();
   
     // Recalculate balance for this and all subsequent entries
