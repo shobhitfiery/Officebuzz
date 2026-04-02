@@ -1,8 +1,23 @@
 const asyncHandler = require("express-async-handler");
 const Ledger = require("../models/ledgerModel");
 
+const parseDateInput = (value) => {
+  if (!value) return null;
+
+  const dateOnlyPattern = /^\d{4}-\d{2}-\d{2}$/;
+  const parsed = dateOnlyPattern.test(value)
+    ? new Date(`${value}T00:00:00.000Z`)
+    : new Date(value);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  return parsed;
+};
+
 const recalculateLedgerBalances = async () => {
-  const entries = await Ledger.find().sort({ timestamp: 1, createdAt: 1, _id: 1 });
+  const entries = await Ledger.find().sort({ depositDate: 1, timestamp: 1, createdAt: 1, _id: 1 });
 
   let runningBalance = 0;
   const operations = entries.map((entry) => {
@@ -24,7 +39,7 @@ const recalculateLedgerBalances = async () => {
 // @route GET /api/ledger
 // @access Private
 const getLedgerEntries = asyncHandler(async (req, res) => {
-  const entries = await Ledger.find().sort({ timestamp: -1 });
+  const entries = await Ledger.find().sort({ timestamp: -1, createdAt: -1, _id: -1 });
   res.json(entries);
 });
 
@@ -45,13 +60,19 @@ const addLedgerEntry = asyncHandler(async (req, res) => {
     throw new Error("Invalid transaction amount");
   }
 
+  const parsedDepositDate = parseDateInput(date);
+  if (date && !parsedDepositDate) {
+    res.status(400);
+    throw new Error("Invalid date");
+  }
+
   const ledger = await Ledger.create({
     transactionAmount: amount,
     employee,
     remarks,
     balance: 0,
-    timestamp: date ? new Date(date) : new Date(),
-    depositDate: date ? new Date(date) : new Date(),
+    timestamp: new Date(),
+    depositDate: parsedDepositDate,
   });
 
   await recalculateLedgerBalances();
@@ -79,12 +100,17 @@ const updateLedgerEntry = asyncHandler(async (req, res) => {
     throw new Error("Invalid transaction amount");
   }
 
+  const parsedDepositDate = parseDateInput(date);
+  if (date && !parsedDepositDate) {
+    res.status(400);
+    throw new Error("Invalid date");
+  }
+
   entry.transactionAmount = amount;
   entry.employee = employee;
   entry.remarks = remarks;
   if (date) {
-    entry.timestamp = new Date(date);
-    entry.depositDate = new Date(date);
+    entry.depositDate = parsedDepositDate;
   }
   await entry.save();
 
@@ -122,12 +148,23 @@ const getLedgerByDateRange = asyncHandler(async (req, res) => {
     throw new Error("Start and end dates are required");
   }
 
+  const startDate = parseDateInput(start);
+  const endDate = parseDateInput(end);
+
+  if (!startDate || !endDate) {
+    res.status(400);
+    throw new Error("Invalid start or end date");
+  }
+
+  const endOfDay = new Date(endDate);
+  endOfDay.setUTCHours(23, 59, 59, 999);
+
   const entries = await Ledger.find({
-    timestamp: {
-      $gte: new Date(start),
-      $lte: new Date(end),
+    depositDate: {
+      $gte: startDate,
+      $lte: endOfDay,
     },
-  }).sort({ timestamp: -1 });
+  }).sort({ timestamp: -1, createdAt: -1, _id: -1 });
 
   res.json(entries);
 });
