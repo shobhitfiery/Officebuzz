@@ -1,19 +1,13 @@
-// For Connecting MongoDB
 // config/db.js
 const mongoose = require('mongoose');
-const dotenv = require('dotenv');
-
-dotenv.config();
 
 const connectDB = async () => {
     try {
-        await mongoose.connect(process.env.MONGO_URI, {
-            useNewUrlParser: true,
-            useUnifiedTopology: true,
-        });
-        console.log('MongoDB Connected ',process.env.MONGO_URI);
+        const conn = await mongoose.connect(process.env.MONGO_URI);
+        // Never log the full URI: it can contain credentials.
+        console.log(`MongoDB connected: ${conn.connection.host}/${conn.connection.name}`);
     } catch (error) {
-        console.error('MongoDB connection error:', error);
+        console.error('MongoDB connection error:', error.message);
         process.exit(1);
     }
 };

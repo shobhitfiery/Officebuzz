@@ -1,5 +1,4 @@
 // models/employeeModel.js
-
 const mongoose = require('mongoose');
 
 const employeeSchema = new mongoose.Schema({
@@ -8,35 +7,29 @@ const employeeSchema = new mongoose.Schema({
         required: [true, 'Employee name is required'],
         trim: true,
     },
+    // Links the employee record to a registered user (by email).
     email: {
         type: String,
-        ref: 'User',
-        required: false,
         trim: true,
         lowercase: true,
     },
-    birthday: {
-        type: Date,
-        required: false,
-    },
-    anniversary: {
-        type: Date,
-        required: false,
-    },
-    joiningDate: {
-        type: Date,
-        required: false,
-    },
+    birthday: { type: Date },
+    anniversary: { type: Date },
+    joiningDate: { type: Date },
     contactNo: {
         type: String,
-        required: false,
         trim: true,
+    },
+    // Inactive employees keep all their history, but are hidden from new ledger
+    // entries and from birthday/anniversary reminders. Missing = active (older records).
+    isActive: {
+        type: Boolean,
+        default: true,
     },
 }, {
     timestamps: true,
 });
 
-// ✅ This prevents re-compilation
 const Employee = mongoose.models.Employee || mongoose.model('Employee', employeeSchema);
 
 module.exports = Employee;

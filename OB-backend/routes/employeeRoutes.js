@@ -13,20 +13,21 @@ const {
 } = require("../controllers/employeeController");
 
 const { protect, admin } = require("../middleware/authMiddleware");
+const { trackAction } = require("../services/analytics");
 
-// Get upcoming birthdays and anniversaries (any logged-in user)
+// Any logged-in user
 router.get("/upcoming/birthdays", protect, getUpcomingBirthdays);
 router.get("/upcoming/anniversaries", protect, getUpcomingAnniversaries);
 router.get("/today/celebrations", protect, getTodayCelebrations);
-// router.get("/upcoming/workanniversaries", protect, getUpcomingWorkAnniversaries);
-
-// View all employees and individual employee (any logged-in user)
 router.get("/", protect, getEmployees);
 router.get("/:id", protect, getEmployeeById);
 
-// Admin-only routes
-router.post("/", protect, admin, addEmployee);
-router.put("/:id", protect, updateEmployee);
-router.delete("/:id", protect, admin, deleteEmployee);
+// Admins can edit anyone; other users can only edit their own linked record
+// (ownership is enforced inside the controller).
+router.put("/:id", protect, trackAction("employee_updated"), updateEmployee);
+
+// Admin-only
+router.post("/", protect, admin, trackAction("employee_added", () => undefined), addEmployee);
+router.delete("/:id", protect, admin, trackAction("employee_deleted"), deleteEmployee);
 
 module.exports = router;

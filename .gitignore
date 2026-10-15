@@ -51,3 +51,5 @@ coverage/
 # package-lock.json
 # yarn.lock
 # Gemfile.lock
+# Pre-redesign snapshot
+backup0/

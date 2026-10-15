@@ -1,27 +1,44 @@
-// server.js 
-
-const express = require('express');
+// server.js
 const dotenv = require('dotenv');
-const path = require('path');
-const connectDB = require('./config/db');
-const authRoutes = require('./routes/authRoutes');
-const ledgerRoutes = require("./routes/ledgerRoutes");
-const employeeRoutes = require("./routes/employeeRoutes");
-const { resetUserPassword } = require('./controllers/authController');
-const { protect, admin } = require('./middleware/authMiddleware');
-// const productRoutes = require('./routes/productRoutes');
-// const orderRoutes = require('./routes/orderRoutes');
-const { notFound, errorHandler } = require('./middleware/errorMiddleware');
-const cors = require('cors');
-
 dotenv.config();
 
-connectDB();
+const express = require('express');
+const path = require('path');
+const cors = require('cors');
+const connectDB = require('./config/db');
+const authRoutes = require('./routes/authRoutes');
+const ledgerRoutes = require('./routes/ledgerRoutes');
+const employeeRoutes = require('./routes/employeeRoutes');
+const eventRoutes = require('./routes/eventRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
+const pollRoutes = require('./routes/pollRoutes');
+const analyticsRoutes = require('./routes/analyticsRoutes');
+const { ensureRetention } = require('./models/analyticsEventModel');
+const dailyReminders = require('./services/dailyReminders');
+const scheduledSender = require('./services/scheduledSender');
+const { notFound, errorHandler } = require('./middleware/errorMiddleware');
+
+['MONGO_URI', 'JWT_SECRET'].forEach((key) => {
+	if (!process.env[key]) {
+		console.error(`Missing required environment variable: ${key}`);
+		process.exit(1);
+	}
+});
+
+connectDB().then(() => {
+	ensureRetention();
+	dailyReminders.start();
+	scheduledSender.start();
+});
 
 const app = express();
+app.disable('x-powered-by');
+// Profile pictures are uploaded as base64 JSON, so that one route gets a larger limit.
+const smallJson = express.json({ limit: '100kb' });
+const avatarJson = express.json({ limit: '700kb' });
+app.use((req, res, next) => (req.path === '/api/users/profile/avatar' ? avatarJson : smallJson)(req, res, next));
 
-app.use(express.json());
-
+// Extra origins can be supplied as a comma-separated list in CORS_ORIGINS.
 const allowedOrigins = [
 	'http://localhost:3000',
 	'http://localhost:3001',
@@ -31,41 +48,44 @@ const allowedOrigins = [
 	'http://127.0.0.1:3002',
 	'http://10.220.84.66:5001',
 	'http://10.220.84.66:3001',
+	...(process.env.CORS_ORIGINS || '').split(',').map((o) => o.trim()).filter(Boolean),
 ];
 
-app.use(cors({
+const corsOptions = {
 	origin: (origin, callback) => {
-		if (!origin || allowedOrigins.includes(origin)) {
-			return callback(null, true);
-		}
-		return callback(new Error('Not allowed by CORS'));
+		// Same-origin requests and tools like curl send no Origin header.
+		if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+		return callback(null, false);
 	},
 	methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-	allowedHeaders: ['Content-Type', 'Authorization'],
-}));
-app.options('*', cors());
+	allowedHeaders: ['Content-Type', 'Authorization', 'X-Session-Id'],
+};
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 
-app.use("/api/ledger", ledgerRoutes);
-app.use("/api/employees", employeeRoutes);
-
+app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
+app.use('/api/ledger', ledgerRoutes);
+app.use('/api/employees', employeeRoutes);
 app.use('/api/users', authRoutes);
-app.put('/api/users/:id/reset-password', protect, admin, resetUserPassword);
-app.post('/api/users/:id/reset-password', protect, admin, resetUserPassword);
-app.put('/api/users/reset-password/:id', protect, admin, resetUserPassword);
-app.post('/api/users/reset-password/:id', protect, admin, resetUserPassword);
-// app.use('/api/products', productRoutes);
-// app.use('/api/orders', orderRoutes);
+app.use('/api/events', eventRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/polls', pollRoutes);
+app.use('/api/analytics', analyticsRoutes);
+
+// Unknown API routes must return JSON 404s, not the React index page.
+app.use('/api', notFound);
 
 // Serve React build
 const frontendBuild = path.join(__dirname, '../officebuzz/build');
-app.use(express.static(frontendBuild));
-app.get('*', (req, res) => {
-  res.sendFile(path.join(frontendBuild, 'index.html'));
+app.use(express.static(frontendBuild, { index: false, maxAge: '1h' }));
+app.get('*', (req, res, next) => {
+	res.sendFile(path.join(frontendBuild, 'index.html'), (err) => {
+		if (err) next();
+	});
 });
 
 app.use(notFound);
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 5001;
-
-app.listen(PORT, console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
