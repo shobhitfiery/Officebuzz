@@ -147,3 +147,11 @@ The pre-change code is in `backup0/` (git-ignored). Restore by copying `backup0/
   - It can be dismissed for the current visit.
 - A temporary password can't be reused as the new password. Admin-created accounts and admin password resets are also flagged as temporary.
 - Links written in any email message are now clickable.
+
+## OfficeBuzz icon everywhere (React logo removed)
+
+- Replaced the Create-React-App placeholder icons with the OfficeBuzz bee mark:
+  - `favicon.ico` (16/32/48/64), `logo192.png`, `logo512.png`.
+  - New `public/icons/`: `officebuzz-192.png`, `officebuzz-512.png`, `officebuzz-maskable-512.png` (Android adaptive icon), `apple-touch-icon.png` (iPhone/iPad home screen), and `badge-96.png` (monochrome Android status-bar badge).
+- `manifest.json` uses the new icons (plus a maskable icon) and opens `/dashboard` when installed. `index.html` points the Apple touch icon at the new file.
+- Push notifications (`sw.js`) show the OfficeBuzz icon and badge.
